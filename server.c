@@ -21,9 +21,9 @@
 #define POSTBUFFERSIZE 512
 
 // 默认配置
-static const char *DEFAULT_UPLOAD_DIR = "/sdcard";
+static const char *DEFAULT_UPLOAD_DIR = "/tmp";
 static const char *FS_ROOT = "/";
-static const char *INDEX_HTML_PATH = "/vendor/etc/www/index.html";
+static const char *INDEX_HTML_PATH = "/system/etc/www/index.html";
 
 // 语言包定义
 typedef struct {
@@ -896,7 +896,7 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
         return MHD_YES;
     }
 
-    if (strcmp(method, "GET") == 0) {
+    if (strcmp(method, "GET") == 0) {        
         if (strncmp(url, "/check_space", 12) == 0) {
             const char *dir = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "dir");
             const char *size_str = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "size");

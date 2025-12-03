@@ -1,0 +1,32 @@
+cc_prebuilt_library_static {
+    name: "libmicrohttpd",
+    arch: {
+        arm64: {
+            srcs: ["build/lib/libmicrohttpd.a"],
+        },
+    },
+    export_include_dirs: ["build/include"],
+}
+
+cc_binary {
+    name: "microhttpd",
+    srcs: ["server.c"],
+    recovery: true,
+    static_libs: ["libmicrohttpd"],
+    ldflags: ["-pthread"],
+    static_executable: true,
+}
+
+prebuilt_etc {
+    name: "index.html",
+    src: "index.html",
+    recovery: true,
+    sub_dir: "www",
+}
+
+prebuilt_etc {
+    name: "microhttpd.rc",
+    src: "microhttpd.rc",
+    recovery: true,
+    sub_dir: "init",
+}

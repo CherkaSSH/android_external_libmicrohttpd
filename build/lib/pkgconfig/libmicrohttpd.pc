@@ -1,0 +1,14 @@
+prefix=/home/adontoo/android/temp/newtemp/build
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libmicrohttpd
+Description: A library for creating an embedded HTTP server
+Version: 1.0.2
+Requires:
+Requires.private: 
+Conflicts:
+Libs: -L${libdir} -lmicrohttpd
+Libs.private:  
+Cflags: -I${includedir}
