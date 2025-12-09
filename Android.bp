@@ -1,5 +1,6 @@
 cc_prebuilt_library_static {
     name: "libmicrohttpd",
+    recovery_available: true,
     arch: {
         arm64: {
             srcs: ["build/lib/libmicrohttpd.a"],
