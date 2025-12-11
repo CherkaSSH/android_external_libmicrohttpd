@@ -173,28 +173,26 @@ button:active {
 }
 
 /* Action Buttons */
-#upload-btn, #path-submit-btn, #cmd-run, #rename-confirm, #delete-confirm {
+#upload-btn, #path-submit-btn, #path-up-btn, #rename-confirm, #delete-confirm {
   background: var(--primary-color);
   color: #FFFFFF;
   border: 1px solid transparent;
   box-shadow: 0 4px 12px rgba(54, 122, 246, 0.3);
 }
 
-#path-submit-btn, #upload-btn {
+#path-submit-btn, #path-up-btn, #upload-btn {
   min-width: 80px;
 }
 
-.dark-theme #upload-btn, 
-.dark-theme #path-submit-btn, 
-.dark-theme #cmd-run {
-  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.2);
-}
+.dark-theme #upload-btn,
+.dark-theme #path-submit-btn,
+.dark-theme #path-up-btn,
 
-#upload-btn:hover, #path-submit-btn:hover, #cmd-run:hover {
+#upload-btn:hover, #path-submit-btn:hover, #path-up-btn:hover {
   background: var(--primary-hover);
 }
 
-#upload-btn:disabled, #path-submit-btn:disabled {
+#upload-btn:disabled, #path-submit-btn:disabled, #path-up-btn:disabled {
   background: var(--text-secondary);
   opacity: 0.5;
   cursor: not-allowed;
@@ -661,6 +659,7 @@ a.file-link:hover, a.dir-link:hover {
     <div class="path-upload-container">
         <div class="path-form">
             <input type="text" name="path" id="path-input" value="{{CURRENT_PATH}}" placeholder="输入路径...">
+            <button type="button" id="path-up-btn" data-i18n="up_button">上级</button>
             <button type="button" id="path-submit-btn" data-i18n="open_button">跳转</button>
         </div>
         <span id="path-status" class="small" style="width:100%"></span>
@@ -726,12 +725,8 @@ a.file-link:hover, a.dir-link:hover {
     <div class="small" data-i18n="terminal_warning" style="margin-bottom: 12px; color: var(--danger-color);">
         命令将在 recovery 环境下以 root 身份执行。务必确认你在做什么。
     </div>
-    <div style="display:flex; gap:10px; margin-bottom: 12px;">
-        <input type="text" id="cmd-input" placeholder="例如: ls -l /" data-i18n-placeholder="cmd_placeholder" style="flex:1; font-family: monospace;">
-        <button id="cmd-run" data-i18n="execute_button">执行</button>
-    </div>
-    <div>
-        <textarea id="cmd-output" readonly placeholder="执行结果将显示在这里..." data-i18n-placeholder="terminal_output_placeholder"></textarea>
+    <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+        <iframe id="ttyd-frame" style="width:100%; min-width:800px; height:520px; border-radius:12px; border:1px solid var(--border-color);"></iframe>
     </div>
 </section>
 
@@ -776,22 +771,26 @@ a.file-link:hover, a.dir-link:hover {
 </main>
 
 <script>
-// 保留原有 JS 逻辑
 let currentXhr = null;
 let isUploading = false;
 let contextMenu = document.getElementById('context-menu');
-let currentLanguage = 'zh'; 
+let currentLanguage = 'zh';
+
+const host = window.location.hostname;
+const url = `http://${host}:7681/`;
+document.getElementById("ttyd-frame").src = url;
 
 const translations = {
     zh: {
         'app_title': 'TWRP 网页文件管理',
         'current_path': '当前路径：',
         'language_toggle': 'English',
-        'theme_toggle': '切换到深色模式',
+        'theme_toggle': '深色',
         'upload_notice': '文件上传中，右键菜单已被禁用，请勿刷新页面！',
         'browse_title': '目录浏览',
         'switch_path': '切换路径:',
         'open_button': '跳转',
+        'up_button': '上级',
         'upload_file': '上传文件:',
         'start_upload': '上传',
         'cancel_upload': '取消',
@@ -834,17 +833,17 @@ const translations = {
         'no_file_selected': '未选择文件',
         'enter_command': '请输入命令',
         'request_failed': '请求失败',
-        'terminal_output_placeholder': '执行结果将显示在这里...'
     },
     en: {
         'app_title': 'TWRP Web File Manager',
         'current_path': 'Path: ',
         'language_toggle': '中文',
-        'theme_toggle': 'Switch to Dark Mode',
+        'theme_toggle': 'Dark',
         'upload_notice': 'Uploading... Do not refresh!',
         'browse_title': 'Explorer',
         'switch_path': 'Path:',
         'open_button': 'Go',
+        'up_button': 'Up',
         'upload_file': 'Upload:',
         'start_upload': 'Upload',
         'cancel_upload': 'Cancel',
@@ -887,7 +886,6 @@ const translations = {
         'no_file_selected': 'No file selected',
         'enter_command': 'Enter command',
         'request_failed': 'Error',
-        'terminal_output_placeholder': 'Execution results will be displayed here...'
     }
 };
 
@@ -922,16 +920,16 @@ function translatePage(lang) {
     
     const languageToggle = document.getElementById('language-toggle');
     if (languageToggle) {
-        languageToggle.textContent = lang === 'zh' ? 'English' : '中文';
+        languageToggle.textContent = lang === 'zh' ? 'EN' : '中文';
     }
     
     const themeToggle = document.getElementById('theme-toggle');
     if (themeToggle) {
         const isDark = document.body.classList.contains('dark-theme');
         if (lang === 'zh') {
-            themeToggle.textContent = isDark ? '切换到浅色模式' : '切换到深色模式';
+            themeToggle.textContent = isDark ? '浅色' : '深色';
         } else {
-            themeToggle.textContent = isDark ? 'Light Mode' : 'Dark Mode';
+            themeToggle.textContent = isDark ? 'Light' : 'Dark';
         }
     }
     
@@ -987,11 +985,11 @@ document.getElementById('theme-toggle').addEventListener('click', function() {
     
     if (body.classList.contains('dark-theme')) {
         body.classList.remove('dark-theme');
-        themeToggle.textContent = currentLanguage === 'zh' ? '切换到深色模式' : 'Dark Mode';
+        themeToggle.textContent = currentLanguage === 'zh' ? '深色' : 'Dark';
         localStorage.setItem('theme', 'light');
     } else {
         body.classList.add('dark-theme');
-        themeToggle.textContent = currentLanguage === 'zh' ? '切换到浅色模式' : 'Light Mode';
+        themeToggle.textContent = currentLanguage === 'zh' ? '浅色' : 'Light';
         localStorage.setItem('theme', 'dark');
     }
 });
@@ -1049,10 +1047,10 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('path-submit-btn').click();
         }
     });
-    
-    document.getElementById('cmd-input').addEventListener('keydown', function(e) {
+
+    document.getElementById('path-input').addEventListener('keydown', function(e) {
         if (e.key === 'Enter') {
-            document.getElementById('cmd-run').click();
+            document.getElementById('path-up-btn').click();
         }
     });
     
@@ -1096,6 +1094,7 @@ function setUploadState(uploading) {
     const fileLinks = document.querySelectorAll('.file-link');
     const fileRows = document.querySelectorAll('.file-row');
     const pathSubmitBtn = document.getElementById('path-submit-btn');
+    const pathUpBtn = document.getElementById('path-up-btn');
     const uploadNotice = document.getElementById('upload-notice');
     const cancelBtn = document.getElementById('cancel-btn');
     const uploadBtn = document.getElementById('upload-btn');
@@ -1107,6 +1106,7 @@ function setUploadState(uploading) {
         fileLinks.forEach(link => link.classList.add('disabled'));
         fileRows.forEach(row => row.classList.add('disabled'));
         pathSubmitBtn.disabled = true;
+        pathUpBtn.disabled = true;
         
         uploadNotice.style.display = 'flex';
         uploadSection.style.display = 'block';
@@ -1120,6 +1120,7 @@ function setUploadState(uploading) {
         fileLinks.forEach(link => link.classList.remove('disabled'));
         fileRows.forEach(row => row.classList.remove('disabled'));
         pathSubmitBtn.disabled = false;
+        pathUpBtn.disabled = false;
         
         uploadNotice.style.display = 'none';
         if (!isUploading) {
@@ -1143,6 +1144,30 @@ document.getElementById('path-submit-btn').addEventListener('click', async funct
     if (isValid) {
         window.location.href = '/?path=' + encodeURIComponent(pathInput);
     }
+});
+
+document.getElementById('path-up-btn').addEventListener('click', async function() {
+    const pathInput = document.getElementById('path-input');
+    const currentPath = pathInput.value;
+    
+    const getParentPath = (path) => {
+        if (!path || path === '/') return '/';
+        
+        const normalized = path.replace(/\/+$/, '');
+        if (normalized === '') return '/';
+        
+        const lastSlashIndex = normalized.lastIndexOf('/');
+        
+        if (lastSlashIndex === -1) return '.';
+        if (lastSlashIndex === 0) return '/';
+        return normalized.substring(0, lastSlashIndex);
+    };
+    
+    const parentPath = getParentPath(currentPath);
+    
+    pathInput.value = parentPath;
+    
+    window.location.href = '/?path=' + encodeURIComponent(parentPath);
 });
 
 function cancelUpload() {
@@ -1301,29 +1326,6 @@ document.getElementById('upload-btn').addEventListener('click', async function()
         currentXhr = null;
         statusSpan.textContent = getTranslation('upload_failed') + ': ' + e;
         spaceStatus.className = 'small space-warning';
-    }
-});
-
-document.getElementById('cmd-run').addEventListener('click', async function() {
-    const cmd = document.getElementById('cmd-input').value;
-    const out = document.getElementById('cmd-output');
-    out.value = '';
-    if (!cmd) {
-        out.value = getTranslation('enter_command');
-        return;
-    }
-    try {
-        const body = new URLSearchParams();
-        body.set('cmd', cmd);
-        const resp = await fetch('/cmd', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString()
-        });
-        const text = await resp.text();
-        out.value = text;
-    } catch (e) {
-        out.value = getTranslation('request_failed') + ': ' + e;
     }
 });
 
