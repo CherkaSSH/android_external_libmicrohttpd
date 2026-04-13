@@ -949,6 +949,24 @@ function detectBrowserLanguage() {
     return 'zh';
 }
 
+function translateFileTableTypes() {
+    const rows = document.querySelectorAll('#file-table-body tr');
+    rows.forEach(row => {
+        const firstCell = row.cells[0];
+        if (!firstCell) return;
+
+        const text = firstCell.textContent.trim();
+
+        if (currentLanguage === 'en') {
+            if (text === '文件') firstCell.textContent = 'File';
+            if (text === '目录') firstCell.textContent = 'Directory';
+        } else {
+            if (text === 'File') firstCell.textContent = '文件';
+            if (text === 'Directory') firstCell.textContent = '目录';
+        }
+    });
+}
+
 function translatePage(lang) {
     currentLanguage = lang;
     
@@ -985,6 +1003,7 @@ function translatePage(lang) {
         }
     }
     
+    translateFileTableTypes();
     localStorage.setItem('language', lang);
 }
 
