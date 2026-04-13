@@ -3,62 +3,70 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>TWRP Web File Manager</title>
+<title>Orangefox Web File Manager</title>
 <style>
 :root {
   /* Light Theme */
-  --bg-color: #F7F8FA;
-  --header-bg: rgba(255, 255, 255, 0.85);
-  --card-bg: #FFFFFF;
-  
-  --primary-color: #367AF6;
-  --primary-hover: #2860C6;
-  --danger-color: #FA4848;
-  --warning-bg: #FFF4E5;
-  --warning-text: #D67A00;
-  
-  --text-primary: #1F2329;
-  --text-secondary: #8F959E;
-  --border-color: #EBEDF0;
-  
-  --input-bg: #F2F4F7;
-  --input-border: transparent;
-  --input-text: #1F2329;
-  
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.02);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.05);
-  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.08);
-  
-  --radius-card: 24px;
+  --bg-color: #F3F1EC;
+  --header-bg: rgba(0, 0, 0, 0.96);
+  --card-bg: #E7E0D5;
+
+  --primary-color: #FF7002;
+  --primary-hover: #E66300;
+  --danger-color: #E54848;
+
+  --warning-bg: #FFE7CC;
+  --warning-text: #D85F00;
+
+  --text-primary: #3F3428;
+  --text-secondary: #7B6A58;
+  --border-color: #D8CFC2;
+
+  --input-bg: #F7F4EE;
+  --input-border: #D9D1C6;
+  --input-text: #3F3428;
+
+  --tag-bg: #E6D8C3;
+  --tag-text: #6A5845;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.05);
+  --shadow-floating: 0 10px 28px rgba(0, 0, 0, 0.10);
+
+  --radius-card: 28px;
   --radius-btn: 999px;
-  --radius-input: 12px;
-  
+  --radius-input: 999px;
+
   --transition-ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark-theme {
   /* Dark Theme */
-  --bg-color: #000000;
-  --header-bg: rgba(30, 30, 30, 0.85);
-  --card-bg: #1C1C1E;
-  
-  --primary-color: #60A5FA;
-  --primary-hover: #93C5FD;
-  --danger-color: #F87171;
-  --warning-bg: #451A03;
-  --warning-text: #FCD34D;
-  
-  --text-primary: #FFFFFF;
-  --text-secondary: #71717A;
-  --border-color: #3F3F46;
-  
-  --input-bg: #27272A;
-  --input-border: #3F3F46;
-  --input-text: #F4F4F5;
-  
+  --bg-color: #121212;
+  --header-bg: rgba(0, 0, 0, 0.96);
+  --card-bg: #1D1A17;
+
+  --primary-color: #FF7002;
+  --primary-hover: #E66300;
+  --danger-color: #F05A5A;
+
+  --warning-bg: #3A2412;
+  --warning-text: #FF9A3D;
+
+  --text-primary: #F4EDE3;
+  --text-secondary: #B5A391;
+  --border-color: #322B25;
+
+  --input-bg: #181512;
+  --input-border: #342C25;
+  --input-text: #F4EDE3;
+
+  --tag-bg: #2A241F;
+  --tag-text: #C9B49E;
+
   --shadow-sm: none;
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.5);
-  --shadow-floating: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --shadow-md: 0 8px 28px rgba(0, 0, 0, 0.35);
+  --shadow-floating: 0 12px 36px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -125,15 +133,15 @@ header {
 }
 
 .current-path {
-  font-weight: 400;
-  color: var(--text-secondary);
-  background: var(--input-bg);
-  padding: 4px 10px;
-  border-radius: 8px;
-  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.82);
+  background: rgba(255,255,255,0.08);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
   font-family: 'Monaco', 'Consolas', monospace;
-  border: 1px solid var(--input-border);
-  max-width: 400px;
+  border: 1px solid rgba(255,255,255,0.06);
+  max-width: 360px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -141,7 +149,7 @@ header {
 
 .header-buttons {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 /* Buttons Base */
@@ -149,11 +157,11 @@ button {
   background: var(--input-bg);
   color: var(--text-primary);
   border: 1px solid var(--input-border);
-  border-radius: var(--radius-btn);
-  padding: 0 20px; 
-  height: 40px; 
+  border-radius: 999px;
+  padding: 0 18px;
+  height: 36px;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s var(--transition-ease);
   display: inline-flex;
@@ -177,16 +185,12 @@ button:active {
   background: var(--primary-color);
   color: #FFFFFF;
   border: 1px solid transparent;
-  box-shadow: 0 4px 12px rgba(54, 122, 246, 0.3);
+  box-shadow: 0 4px 12px rgba(245, 124, 0, 0.35);
 }
 
 #path-submit-btn, #path-up-btn, #upload-btn {
   min-width: 80px;
 }
-
-.dark-theme #upload-btn,
-.dark-theme #path-submit-btn,
-.dark-theme #path-up-btn,
 
 #upload-btn:hover, #path-submit-btn:hover, #path-up-btn:hover {
   background: var(--primary-hover);
@@ -208,28 +212,50 @@ button:active {
 
 /* Main Layout */
 main {
-  max-width: 1200px;
+  max-width: 980px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px;
+  padding: 24px 20px 36px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+}
+
+.hero-title {
+  text-align: center;
+  margin: 4px 0 8px;
+  line-height: 0.95;
+}
+
+.hero-title span,
+.hero-title strong {
+  display: block;
+  font-weight: 900;
+  letter-spacing: -1.5px;
+  font-size: clamp(34px, 8vw, 72px);
+}
+
+.hero-title span {
+  color: var(--text-primary);
+}
+
+.hero-title strong {
+  color: var(--primary-color);
 }
 
 section {
   background: var(--card-bg);
   border-radius: var(--radius-card);
-  padding: 24px;
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--input-border);
-  transition: transform 0.2s, box-shadow 0.2s;
+  padding: 22px;
+  box-shadow: none;
+  border: 1px solid var(--border-color);
+  transition: background 0.2s, border-color 0.2s;
 }
 
 h2 {
-  margin: 0 0 20px 0;
-  font-size: 20px;
-  font-weight: 700;
+  margin: 0 0 18px 0;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: center;
@@ -251,82 +277,94 @@ input[type="text"], textarea, select {
 
 input[type="text"]::placeholder, textarea::placeholder {
   color: var(--text-secondary);
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 input[type="text"]:focus, textarea:focus {
-  background: var(--card-bg);
+  background: var(--input-bg);
   border-color: var(--primary-color);
-  box-shadow: 0 0 0 3px rgba(54, 122, 246, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 112, 2, 0.14);
 }
 
 textarea {
   width: 100%;
   min-height: 120px;
-  padding: 12px 16px; 
+  padding: 14px 18px;
   height: auto;
   font-family: 'Monaco', 'Menlo', monospace;
   line-height: 1.6;
   resize: vertical;
+  border-radius: 18px;
 }
 
 /* Table Styling */
 table {
   width: 100%;
   border-collapse: separate;
-  border-spacing: 0;
-  margin-top: 10px;
+  border-spacing: 0 10px;
+  margin-top: 8px;
 }
 
 thead th {
   text-align: left;
-  padding: 12px 16px;
+  padding: 0 16px 8px;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   background: transparent;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: none;
 }
 
 tbody tr {
-  transition: background-color 0.2s;
+  transition: background-color 0.2s, transform 0.2s;
 }
 
 tbody td {
   padding: 16px;
-  border-bottom: 1px solid var(--border-color);
+  border-top: 1px solid transparent;
+  border-bottom: 1px solid transparent;
   color: var(--text-primary);
   font-size: 14px;
+  background: rgba(255,255,255,0.14);
 }
 
-tbody tr:last-child td {
-  border-bottom: none;
+.dark-theme tbody td {
+  background: rgba(255,255,255,0.03);
 }
 
-tbody tr:hover {
-  background-color: var(--bg-color);
+tbody td:first-child {
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+}
+
+tbody td:last-child {
+  border-top-right-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+
+tbody tr:hover td {
+  background-color: rgba(255, 112, 2, 0.08);
 }
 
 /* Links */
 a.dir-link, a.file-link {
   color: var(--text-primary) !important;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 700;
   transition: color 0.2s;
   display: inline-block;
   padding: 2px 0;
 }
 
 a.dir-link {
-  color: var(--primary-color) !important;
-  font-weight: 600;
+  color: var(--text-primary) !important;
 }
 
 a.file-link:hover, a.dir-link:hover {
-  color: var(--primary-hover) !important;
-  text-decoration: underline;
+  color: var(--primary-color) !important;
+  text-decoration: none;
 }
 
 /* Upload Component - Desktop */
@@ -335,11 +373,11 @@ a.file-link:hover, a.dir-link:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-  background: var(--bg-color);
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid var(--input-border);
+  margin-bottom: 14px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border: none;
 }
 
 .path-form {
@@ -414,39 +452,44 @@ a.file-link:hover, a.dir-link:hover {
 .space-warning { color: var(--danger-color); font-weight: 600; }
 
 .upload-notice {
-  background: var(--warning-bg);
-  color: var(--warning-text);
-  border-radius: 12px;
-  padding: 12px 16px;
-  margin: 0 20px 20px 20px;
-  font-weight: 600;
-  border: 1px solid rgba(0,0,0,0.05);
+  background: #000000;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 14px 18px;
+  margin: 0 auto 18px;
+  max-width: 980px;
+  font-weight: 700;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .progress-bar {
-  height: 8px;
-  background: var(--input-bg);
-  border-radius: 99px;
-  margin: 12px 0;
+  height: 6px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 999px;
+  margin: 10px 0;
   overflow: hidden;
+}
+
+.dark-theme .progress-bar {
+  background: rgba(255,255,255,0.08);
 }
 
 .progress-fill {
   height: 100%;
   background: var(--primary-color);
-  border-radius: 99px;
+  border-radius: 999px;
   transition: width 0.3s ease;
 }
 
 .upload-section {
-  background: var(--bg-color);
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid var(--input-border);
-  margin-top: 16px;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border: none;
+  margin-top: 10px;
 }
 
 /* Context Menu */
@@ -455,25 +498,29 @@ a.file-link:hover, a.dir-link:hover {
   position: fixed;
   background: var(--card-bg);
   border: 1px solid var(--border-color);
-  border-radius: 12px;
+  border-radius: 18px;
   box-shadow: var(--shadow-floating);
-  padding: 6px;
-  min-width: 140px;
+  padding: 8px;
+  min-width: 160px;
   z-index: 1000;
 }
 
-.context-menu ul { padding: 0; margin: 0; list-style: none; }
 .context-menu li {
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 11px 12px;
+  border-radius: 12px;
   font-size: 14px;
+  font-weight: 700;
   color: var(--text-primary);
   transition: background 0.2s;
   cursor: pointer;
   display: flex;
   align-items: center;
 }
-.context-menu li:hover { background: var(--primary-color); color: white; }
+
+.context-menu li:hover {
+  background: var(--primary-color);
+  color: white;
+}
 
 /* Modals */
 .modal {
@@ -492,11 +539,11 @@ a.file-link:hover, a.dir-link:hover {
 
 .modal-content {
   background: var(--card-bg);
-  border-radius: 28px; 
+  border-radius: 28px;
   border: 1px solid var(--border-color);
-  padding: 32px;
+  padding: 28px;
   box-shadow: var(--shadow-floating);
-  max-width: 400px;
+  max-width: 420px;
   width: 90%;
   position: relative;
 }
@@ -633,7 +680,7 @@ a.file-link:hover, a.dir-link:hover {
 }
 </style>
 </head>
-<body>
+<body class="dark-theme">
 <header>
     <div class="header-inner">
         <div class="header-title">
@@ -652,6 +699,11 @@ a.file-link:hover, a.dir-link:hover {
 </div>
 
 <main>
+
+<div class="hero-title">
+  <span>OrangeFox</span>
+  <strong>File Manager</strong>
+</div>
 
 <section>
     <h2 data-i18n="browse_title">目录浏览</h2>    
@@ -835,7 +887,7 @@ const translations = {
         'request_failed': '请求失败',
     },
     en: {
-        'app_title': 'TWRP Web File Manager',
+        'app_title': 'Orangefox Web File Manager',
         'current_path': 'Path: ',
         'language_toggle': '中文',
         'theme_toggle': 'Dark',
@@ -1000,7 +1052,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const savedTheme = localStorage.getItem('theme');
     
-    if (savedTheme === 'dark') {
+    if (savedTheme === 'light') {
         document.body.classList.add('dark-theme');
     } else {
         document.body.classList.remove('dark-theme');
