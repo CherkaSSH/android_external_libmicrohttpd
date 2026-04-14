@@ -24,6 +24,16 @@
 static const char *DEFAULT_UPLOAD_DIR = "/tmp";
 static const char *FS_ROOT = "/";
 static const char *INDEX_HTML_PATH = "/system/etc/www/index.html";
+static const char *WWW_ROOT = "/system/etc/www";
+
+// 前向声明
+static const char *get_translation(const char *key, const char *lang);
+static enum MHD_Result send_response_with_lang(struct MHD_Connection *connection,
+                                               const char *content_type,
+                                               const char *data,
+                                               size_t size,
+                                               unsigned int status_code,
+                                               const char *lang);
 
 // 语言包定义
 typedef struct {
@@ -79,7 +89,7 @@ struct connection_info_struct {
     char *post_data;
     size_t post_data_size;
     size_t post_data_alloc;
-    
+
     // 上传相关字段
     int upload_fd;
     char *upload_filename;
@@ -88,7 +98,7 @@ struct connection_info_struct {
     char *upload_file_path;
     int upload_cancelled;
     struct MHD_Connection *connection;
-    
+
     // 语言支持
     char language[10];
 };
@@ -96,13 +106,13 @@ struct connection_info_struct {
 // 工具函数：检测客户端语言
 static const char *detect_client_language(struct MHD_Connection *connection) {
     const char *accept_language = MHD_lookup_connection_value(connection, MHD_HEADER_KIND, "Accept-Language");
-    
+
     if (accept_language) {
         if (strstr(accept_language, "zh") != NULL) {
             return "zh";
         }
     }
-    
+
     return "en";
 }
 
@@ -224,14 +234,14 @@ static int check_disk_space(const char *path, size_t required_size, char *errmsg
         snprintf(errmsg, errmsg_len, get_translation("disk_space_error", lang), strerror(errno));
         return -1;
     }
-    
+
     unsigned long long free_space = (unsigned long long)st.f_bavail * st.f_frsize;
-    
+
     if (free_space < required_size) {
         snprintf(errmsg, errmsg_len, get_translation("space_insufficient", lang), required_size, free_space);
         return -1;
     }
-    
+
     return 0;
 }
 
@@ -245,15 +255,15 @@ static const char *get_filename_from_path(const char *path) {
 // 工具函数：URL编码文件名
 static char *url_encode_filename(const char *filename) {
     if (!filename) return strdup("download");
-    
+
     size_t len = strlen(filename);
     char *encoded = malloc(len * 3 + 1);
     if (!encoded) return NULL;
-    
+
     char *p = encoded;
     for (size_t i = 0; i < len; i++) {
         unsigned char c = filename[i];
-        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
             (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.') {
             *p++ = c;
         } else {
@@ -276,10 +286,10 @@ struct dir_entry {
 static int compare_entries(const void *a, const void *b) {
     const struct dir_entry *entry_a = (const struct dir_entry *)a;
     const struct dir_entry *entry_b = (const struct dir_entry *)b;
-    
+
     if (entry_a->is_dir && !entry_b->is_dir) return -1;
     if (!entry_a->is_dir && entry_b->is_dir) return 1;
-    
+
     return strcasecmp(entry_a->name, entry_b->name);
 }
 
@@ -298,7 +308,7 @@ static char *generate_dir_listing_html(const char *rel_path) {
     struct dir_entry *entries = NULL;
     int num_entries = 0;
     int allocated = 100;
-    
+
     entries = malloc(allocated * sizeof(struct dir_entry));
     if (!entries) {
         closedir(dir);
@@ -426,7 +436,7 @@ static char *generate_dir_listing_html(const char *rel_path) {
 static char *read_file(const char *path, size_t *out_size) {
     FILE *fp = fopen(path, "rb");
     if (!fp) return NULL;
-    
+
     fseek(fp, 0, SEEK_END);
     long sz = ftell(fp);
     if (sz < 0) {
@@ -434,13 +444,13 @@ static char *read_file(const char *path, size_t *out_size) {
         return NULL;
     }
     fseek(fp, 0, SEEK_SET);
-    
+
     char *buf = malloc(sz + 1);
     if (!buf) {
         fclose(fp);
         return NULL;
     }
-    
+
     size_t n = fread(buf, 1, sz, fp);
     fclose(fp);
     buf[n] = '\0';
@@ -448,23 +458,83 @@ static char *read_file(const char *path, size_t *out_size) {
     return buf;
 }
 
+// 工具函数：静态文件服务
+static enum MHD_Result serve_static_file(struct MHD_Connection *connection,
+                                         const char *url_path,
+                                         const char *lang) {
+    if (!url_path || strcmp(url_path, "/") == 0) {
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("not_found", lang),
+                                       strlen(get_translation("not_found", lang)), 404, lang);
+    }
+
+    if (strstr(url_path, "..")) {
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("invalid_path", lang),
+                                       strlen(get_translation("invalid_path", lang)), 400, lang);
+    }
+
+    char full_path[MAX_PATH_LEN];
+    snprintf(full_path, sizeof(full_path), "%s%s", WWW_ROOT, url_path);
+
+    int fd = open(full_path, O_RDONLY);
+    if (fd < 0) {
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("not_found", lang),
+                                       strlen(get_translation("not_found", lang)), 404, lang);
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        close(fd);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("not_found", lang),
+                                       strlen(get_translation("not_found", lang)), 404, lang);
+    }
+
+    const char *content_type = "application/octet-stream";
+    const char *ext = strrchr(full_path, '.');
+    if (ext) {
+        if (strcmp(ext, ".png") == 0) content_type = "image/png";
+        else if (strcmp(ext, ".jpg") == 0 || strcmp(ext, ".jpeg") == 0) content_type = "image/jpeg";
+        else if (strcmp(ext, ".svg") == 0) content_type = "image/svg+xml";
+        else if (strcmp(ext, ".css") == 0) content_type = "text/css";
+        else if (strcmp(ext, ".js") == 0) content_type = "application/javascript";
+        else if (strcmp(ext, ".html") == 0) content_type = "text/html";
+        else if (strcmp(ext, ".ico") == 0) content_type = "image/x-icon";
+    }
+
+    struct MHD_Response *response = MHD_create_response_from_fd(st.st_size, fd);
+    if (!response) {
+        close(fd);
+        return MHD_NO;
+    }
+
+    MHD_add_response_header(response, "Content-Type", content_type);
+    MHD_add_response_header(response, "Cache-Control", "public, max-age=86400");
+
+    enum MHD_Result ret = MHD_queue_response(connection, 200, response);
+    MHD_destroy_response(response);
+    return ret;
+}
+
 // 工具函数：替换模板占位符
 static char *replace_placeholder(const char *tmpl, const char *token, const char *value) {
     const char *pos = strstr(tmpl, token);
     if (!pos) return strdup(tmpl);
-    
+
     size_t token_len = strlen(token);
     size_t value_len = strlen(value);
     size_t tmpl_len = strlen(tmpl);
-    
+
     char *result = malloc(tmpl_len - token_len + value_len + 1);
     if (!result) return NULL;
-    
-    size_t prefix_len = pos - tmpl;
+
+    size_t prefix_len = (size_t)(pos - tmpl);
     memcpy(result, tmpl, prefix_len);
     memcpy(result + prefix_len, value, value_len);
     strcpy(result + prefix_len + value_len, pos + token_len);
-    
+
     return result;
 }
 
@@ -488,11 +558,11 @@ static char *run_command(const char *cmd) {
         pclose(fp);
         return NULL;
     }
-    
+
     size_t total = 0;
     int c;
     while ((c = fgetc(fp)) != EOF && total + 1 < MAX_CMD_OUTPUT) {
-        buf[total++] = c;
+        buf[total++] = (char)c;
     }
     buf[total] = '\0';
     pclose(fp);
@@ -501,11 +571,11 @@ static char *run_command(const char *cmd) {
 
 // HTTP响应函数（增强版，支持语言）
 static enum MHD_Result send_response_with_lang(struct MHD_Connection *connection,
-                         const char *content_type,
-                         const char *data,
-                         size_t size,
-                         unsigned int status_code,
-                         const char *lang) {
+                                               const char *content_type,
+                                               const char *data,
+                                               size_t size,
+                                               unsigned int status_code,
+                                               const char *lang) {
     struct MHD_Response *response = MHD_create_response_from_buffer(size,
                                                                     (void *)data,
                                                                     MHD_RESPMEM_MUST_COPY);
@@ -514,7 +584,7 @@ static enum MHD_Result send_response_with_lang(struct MHD_Connection *connection
     MHD_add_response_header(response, "Content-Type", content_type);
     MHD_add_response_header(response, "Access-Control-Allow-Origin", "*");
     MHD_add_response_header(response, "Content-Language", lang);
-    
+
     enum MHD_Result ret = MHD_queue_response(connection, status_code, response);
     MHD_destroy_response(response);
     return ret;
@@ -522,10 +592,10 @@ static enum MHD_Result send_response_with_lang(struct MHD_Connection *connection
 
 // 简化的响应函数
 static enum MHD_Result send_response(struct MHD_Connection *connection,
-                         const char *content_type,
-                         const char *data,
-                         size_t size,
-                         unsigned int status_code) {
+                                     const char *content_type,
+                                     const char *data,
+                                     size_t size,
+                                     unsigned int status_code) {
     return send_response_with_lang(connection, content_type, data, size, status_code, "en");
 }
 
@@ -572,10 +642,9 @@ static int create_upload_file(const char *target_dir, const char *filename, char
         snprintf(errmsg, errmsg_len, "%s", get_translation("missing_filename", lang));
         return -1;
     }
-    
+
     const char *dir = target_dir && *target_dir ? target_dir : DEFAULT_UPLOAD_DIR;
-    
-    // 确保目录存在
+
     if (mkdir(dir, 0777) != 0 && errno != EEXIST) {
         snprintf(errmsg, errmsg_len, "Permission denied: %s", strerror(errno));
         return -1;
@@ -588,12 +657,11 @@ static int create_upload_file(const char *target_dir, const char *filename, char
     }
 
     size_t len = strlen(path);
-    if (len > 0 && path[len-1] == '/')
+    if (len > 0 && path[len - 1] == '/')
         snprintf(path + len, sizeof(path) - len, "%s", filename);
     else
         snprintf(path + len, sizeof(path) - len, "/%s", filename);
 
-    // 检查文件是否已存在
     if (access(path, F_OK) == 0) {
         snprintf(errmsg, errmsg_len, "%s", get_translation("upload_file_exists", lang));
         return -1;
@@ -604,7 +672,7 @@ static int create_upload_file(const char *target_dir, const char *filename, char
         snprintf(errmsg, errmsg_len, "Permission denied: %s", strerror(errno));
         return -1;
     }
-    
+
     return fd;
 }
 
@@ -616,178 +684,174 @@ static void delete_uploaded_file(const char *file_path) {
 }
 
 // 检查空间处理
-static enum MHD_Result handle_check_space(struct MHD_Connection *connection, 
-                                         const char *upload_dir, 
-                                         size_t file_size,
-                                         const char *lang) {
+static enum MHD_Result handle_check_space(struct MHD_Connection *connection,
+                                          const char *upload_dir,
+                                          size_t file_size,
+                                          const char *lang) {
     char errmsg[256];
     char real_dir[MAX_PATH_LEN];
-    
+
     if (build_safe_path(upload_dir, real_dir, sizeof(real_dir)) != 0) {
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("invalid_path", lang), 
-                                     strlen(get_translation("invalid_path", lang)), 400, lang);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("invalid_path", lang),
+                                       strlen(get_translation("invalid_path", lang)), 400, lang);
     }
-    
+
     if (check_disk_space(real_dir, file_size, errmsg, sizeof(errmsg), lang) != 0) {
         return send_response_with_lang(connection, "text/plain", errmsg, strlen(errmsg), 507, lang);
     }
-    
-    return send_response_with_lang(connection, "text/plain", 
-                                 get_translation("space_sufficient", lang), 
-                                 strlen(get_translation("space_sufficient", lang)), 200, lang);
+
+    return send_response_with_lang(connection, "text/plain",
+                                   get_translation("space_sufficient", lang),
+                                   strlen(get_translation("space_sufficient", lang)), 200, lang);
 }
 
 // 检查路径处理
-static enum MHD_Result handle_check_path(struct MHD_Connection *connection, 
-                                        const char *path_param,
-                                        const char *lang) {
+static enum MHD_Result handle_check_path(struct MHD_Connection *connection,
+                                         const char *path_param,
+                                         const char *lang) {
     if (!path_param || !*path_param) {
-        return send_response_with_lang(connection, "text/plain", 
-                                      get_translation("missing_path_param", lang), 
-                                      strlen(get_translation("missing_path_param", lang)), 400, lang);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("missing_path_param", lang),
+                                       strlen(get_translation("missing_path_param", lang)), 400, lang);
     }
-    
+
     char errmsg[256];
     if (check_path_valid(path_param, errmsg, sizeof(errmsg), lang) != 0) {
         return send_response_with_lang(connection, "text/plain", errmsg, strlen(errmsg), 404, lang);
     }
-    
-    return send_response_with_lang(connection, "text/plain", 
-                                 get_translation("path_valid", lang), 
-                                 strlen(get_translation("path_valid", lang)), 200, lang);
+
+    return send_response_with_lang(connection, "text/plain",
+                                   get_translation("path_valid", lang),
+                                   strlen(get_translation("path_valid", lang)), 200, lang);
 }
 
 // 取消上传处理
 static enum MHD_Result handle_cancel_upload(struct connection_info_struct *con_info,
-                                           struct MHD_Connection *connection) {
+                                            struct MHD_Connection *connection) {
     if (!con_info->upload_started) {
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("no_upload_in_progress", con_info->language), 
-                                     strlen(get_translation("no_upload_in_progress", con_info->language)), 400, 
-                                     con_info->language);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("no_upload_in_progress", con_info->language),
+                                       strlen(get_translation("no_upload_in_progress", con_info->language)), 400,
+                                       con_info->language);
     }
-    
+
     if (con_info->upload_file_path) {
         delete_uploaded_file(con_info->upload_file_path);
         free(con_info->upload_file_path);
         con_info->upload_file_path = NULL;
     }
-    
+
     if (con_info->upload_fd >= 0) {
         close(con_info->upload_fd);
         con_info->upload_fd = -1;
     }
-    
+
     con_info->upload_started = 0;
     con_info->upload_cancelled = 1;
-    
-    return send_response_with_lang(connection, "text/plain", 
-                                 get_translation("upload_cancelled", con_info->language), 
-                                 strlen(get_translation("upload_cancelled", con_info->language)), 200, 
-                                 con_info->language);
+
+    return send_response_with_lang(connection, "text/plain",
+                                   get_translation("upload_cancelled", con_info->language),
+                                   strlen(get_translation("upload_cancelled", con_info->language)), 200,
+                                   con_info->language);
 }
 
 // 重命名文件处理
-static enum MHD_Result handle_rename(struct MHD_Connection *connection, 
-                                   const char *old_path, 
-                                   const char *new_path,
-                                   const char *lang) {
+static enum MHD_Result handle_rename(struct MHD_Connection *connection,
+                                     const char *old_path,
+                                     const char *new_path,
+                                     const char *lang) {
     char real_old_path[MAX_PATH_LEN];
     char real_new_path[MAX_PATH_LEN];
-    
+
     if (build_safe_path(old_path, real_old_path, sizeof(real_old_path)) != 0 ||
         build_safe_path(new_path, real_new_path, sizeof(real_new_path)) != 0) {
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("invalid_path", lang), 
-                                     strlen(get_translation("invalid_path", lang)), 400, lang);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("invalid_path", lang),
+                                       strlen(get_translation("invalid_path", lang)), 400, lang);
     }
-    
+
     if (rename(real_old_path, real_new_path) != 0) {
         char errmsg[256];
         snprintf(errmsg, sizeof(errmsg), get_translation("rename_failed", lang), strerror(errno));
         return send_response_with_lang(connection, "text/plain", errmsg, strlen(errmsg), 500, lang);
     }
-    
+
     return send_response_with_lang(connection, "text/plain", "OK", 2, 200, lang);
 }
 
 // 删除文件处理
-static enum MHD_Result handle_delete(struct MHD_Connection *connection, 
-                                     const char *path, 
+static enum MHD_Result handle_delete(struct MHD_Connection *connection,
+                                     const char *path,
                                      const char *type,
                                      const char *lang) {
     char real_path[MAX_PATH_LEN];
-    
+
     if (build_safe_path(path, real_path, sizeof(real_path)) != 0) {
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("invalid_path", lang), 
-                                     strlen(get_translation("invalid_path", lang)), 400, lang);
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("invalid_path", lang),
+                                       strlen(get_translation("invalid_path", lang)), 400, lang);
     }
-    
+
     int result;
     if (strcmp(type, "dir") == 0) {
         result = rmdir(real_path);
     } else {
         result = unlink(real_path);
     }
-    
+
     if (result != 0) {
         char errmsg[256];
         snprintf(errmsg, sizeof(errmsg), get_translation("delete_failed", lang), strerror(errno));
         return send_response_with_lang(connection, "text/plain", errmsg, strlen(errmsg), 500, lang);
     }
-    
+
     return send_response_with_lang(connection, "text/plain", "OK", 2, 200, lang);
 }
 
 // 处理文件上传
 static enum MHD_Result handle_upload(struct connection_info_struct *con_info,
-                                    struct MHD_Connection *connection,
-                                    const char *upload_data,
-                                    size_t upload_data_size) {
+                                     struct MHD_Connection *connection,
+                                     const char *upload_data,
+                                     size_t upload_data_size) {
     const char *lang = con_info->language;
-    
-    // 如果是第一次调用，初始化上传
+
     if (!con_info->upload_started) {
         const char *filename = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "filename");
         const char *upload_dir = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "upload_dir");
-        
+
         if (!filename || !*filename) {
-            return send_response_with_lang(connection, "text/plain", 
-                                         get_translation("missing_filename", lang), 
-                                         strlen(get_translation("missing_filename", lang)), 400, lang);
+            return send_response_with_lang(connection, "text/plain",
+                                           get_translation("missing_filename", lang),
+                                           strlen(get_translation("missing_filename", lang)), 400, lang);
         }
-        
+
         char errmsg[256];
         con_info->upload_fd = create_upload_file(upload_dir, filename, errmsg, sizeof(errmsg), lang);
         if (con_info->upload_fd < 0) {
             return send_response_with_lang(connection, "text/plain", errmsg, strlen(errmsg), 500, lang);
         }
-        
-        // 保存文件路径
+
         const char *dir = upload_dir && *upload_dir ? upload_dir : DEFAULT_UPLOAD_DIR;
         char path[MAX_PATH_LEN];
         if (build_safe_path(dir, path, sizeof(path)) == 0) {
             size_t len = strlen(path);
-            if (len > 0 && path[len-1] == '/')
+            if (len > 0 && path[len - 1] == '/')
                 snprintf(path + len, sizeof(path) - len, "%s", filename);
             else
                 snprintf(path + len, sizeof(path) - len, "/%s", filename);
-            
+
             con_info->upload_file_path = strdup(path);
         }
-        
+
         con_info->upload_started = 1;
         con_info->upload_filename = strdup(filename);
         con_info->upload_dir = strdup(upload_dir ? upload_dir : DEFAULT_UPLOAD_DIR);
     }
-    
-    // 写入数据到文件
+
     if (upload_data_size > 0) {
         ssize_t written = write(con_info->upload_fd, upload_data, upload_data_size);
         if (written != (ssize_t)upload_data_size) {
-            // 写入失败
             close(con_info->upload_fd);
             con_info->upload_fd = -1;
             if (con_info->upload_file_path) {
@@ -795,86 +859,86 @@ static enum MHD_Result handle_upload(struct connection_info_struct *con_info,
                 free(con_info->upload_file_path);
                 con_info->upload_file_path = NULL;
             }
-            
-            return send_response_with_lang(connection, "text/plain", 
-                                         get_translation("upload_failed", lang), 
-                                         strlen(get_translation("upload_failed", lang)), 500, lang);
+
+            return send_response_with_lang(connection, "text/plain",
+                                           get_translation("upload_failed", lang),
+                                           strlen(get_translation("upload_failed", lang)), 500, lang);
         }
     }
-    
+
     return MHD_YES;
 }
 
 // 完成文件上传
 static enum MHD_Result finish_upload(struct connection_info_struct *con_info,
-                                    struct MHD_Connection *connection) {
+                                     struct MHD_Connection *connection) {
     const char *lang = con_info->language;
-    
+
     if (con_info->upload_cancelled) {
         if (con_info->upload_file_path) {
             delete_uploaded_file(con_info->upload_file_path);
             free(con_info->upload_file_path);
             con_info->upload_file_path = NULL;
         }
-        
+
         if (con_info->upload_fd >= 0) {
             close(con_info->upload_fd);
             con_info->upload_fd = -1;
         }
-        
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("upload_cancelled", lang), 
-                                     strlen(get_translation("upload_cancelled", lang)), 200, lang);
+
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("upload_cancelled", lang),
+                                       strlen(get_translation("upload_cancelled", lang)), 200, lang);
     }
-    
+
     if (con_info->upload_fd >= 0) {
         close(con_info->upload_fd);
         con_info->upload_fd = -1;
     }
-    
-    // 验证文件是否成功创建
+
     if (con_info->upload_file_path) {
         struct stat st;
         if (stat(con_info->upload_file_path, &st) != 0) {
-            return send_response_with_lang(connection, "text/plain", 
-                                         get_translation("upload_failed", lang), 
-                                         strlen(get_translation("upload_failed", lang)), 500, lang);
+            return send_response_with_lang(connection, "text/plain",
+                                           get_translation("upload_failed", lang),
+                                           strlen(get_translation("upload_failed", lang)), 500, lang);
         }
-        
+
         free(con_info->upload_file_path);
         con_info->upload_file_path = NULL;
     }
-    
+
     if (con_info->upload_filename) {
         free(con_info->upload_filename);
         con_info->upload_filename = NULL;
     }
-    
+
     if (con_info->upload_dir) {
         free(con_info->upload_dir);
         con_info->upload_dir = NULL;
     }
-    
+
     con_info->upload_started = 0;
-    
-    return send_response_with_lang(connection, "text/plain", 
-                                 get_translation("upload_success", lang), 
-                                 strlen(get_translation("upload_success", lang)), 200, lang);
+
+    return send_response_with_lang(connection, "text/plain",
+                                   get_translation("upload_success", lang),
+                                   strlen(get_translation("upload_success", lang)), 200, lang);
 }
 
 // 主请求处理函数
 static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *connection,
-                                const char *url, const char *method, const char *version,
-                                const char *upload_data, size_t *upload_data_size,
-                                void **con_cls) {
-    (void)cls; (void)version;
+                                            const char *url, const char *method, const char *version,
+                                            const char *upload_data, size_t *upload_data_size,
+                                            void **con_cls) {
+    (void)cls;
+    (void)version;
 
     struct connection_info_struct *con_info = *con_cls;
 
     if (!con_info) {
         con_info = calloc(1, sizeof(*con_info));
         if (!con_info) return MHD_NO;
-        
+
         con_info->post_data_alloc = POSTBUFFERSIZE;
         con_info->post_data = malloc(con_info->post_data_alloc);
         if (!con_info->post_data) {
@@ -887,28 +951,28 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
         con_info->upload_started = 0;
         con_info->upload_cancelled = 0;
         con_info->connection = connection;
-        
+
         const char *lang = detect_client_language(connection);
         strncpy(con_info->language, lang, sizeof(con_info->language) - 1);
         con_info->language[sizeof(con_info->language) - 1] = '\0';
-        
+
         *con_cls = con_info;
         return MHD_YES;
     }
 
-    if (strcmp(method, "GET") == 0) {        
+    if (strcmp(method, "GET") == 0) {
         if (strncmp(url, "/check_space", 12) == 0) {
             const char *dir = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "dir");
             const char *size_str = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "size");
-            
+
             if (!dir || !size_str) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("missing_parameters", con_info->language), 
-                                            strlen(get_translation("missing_parameters", con_info->language)), 400, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("missing_parameters", con_info->language),
+                                               strlen(get_translation("missing_parameters", con_info->language)), 400,
+                                               con_info->language);
             }
-            
-            size_t file_size = atoll(size_str);
+
+            size_t file_size = (size_t)atoll(size_str);
             return handle_check_space(connection, dir, file_size, con_info->language);
         }
 
@@ -924,38 +988,38 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
         if (strncmp(url, "/download", 9) == 0) {
             const char *file_path = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "path");
             if (!file_path) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("missing_path_param", con_info->language), 
-                                            strlen(get_translation("missing_path_param", con_info->language)), 400, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("missing_path_param", con_info->language),
+                                               strlen(get_translation("missing_path_param", con_info->language)), 400,
+                                               con_info->language);
             }
 
             char safe_path[MAX_PATH_LEN];
             if (build_safe_path(file_path, safe_path, sizeof(safe_path)) != 0) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("invalid_path", con_info->language), 
-                                            strlen(get_translation("invalid_path", con_info->language)), 400, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("invalid_path", con_info->language),
+                                               strlen(get_translation("invalid_path", con_info->language)), 400,
+                                               con_info->language);
             }
 
             int fd = open(safe_path, O_RDONLY);
             if (fd < 0) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("file_not_found", con_info->language), 
-                                            strlen(get_translation("file_not_found", con_info->language)), 404, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("file_not_found", con_info->language),
+                                               strlen(get_translation("file_not_found", con_info->language)), 404,
+                                               con_info->language);
             }
 
             struct stat st;
             if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
                 close(fd);
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("not_regular_file", con_info->language), 
-                                            strlen(get_translation("not_regular_file", con_info->language)), 400, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("not_regular_file", con_info->language),
+                                               strlen(get_translation("not_regular_file", con_info->language)), 400,
+                                               con_info->language);
             }
 
-            struct MHD_Response *response = MHD_create_response_from_fd(st.st_size, fd);
+            struct MHD_Response *response = MHD_create_response_from_fd((uint64_t)st.st_size, fd);
             if (!response) {
                 close(fd);
                 return MHD_NO;
@@ -963,11 +1027,11 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
 
             const char *filename = get_filename_from_path(file_path);
             char *encoded = url_encode_filename(filename);
-            
+
             char disposition[512];
             if (encoded) {
-                snprintf(disposition, sizeof(disposition), 
-                        "attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encoded);
+                snprintf(disposition, sizeof(disposition),
+                         "attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encoded);
                 free(encoded);
             } else {
                 snprintf(disposition, sizeof(disposition), "attachment; filename=\"%s\"", filename);
@@ -981,47 +1045,55 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
             return ret;
         }
 
+        if (strcmp(url, "/fox_icon.png") == 0 ||
+            strcmp(url, "/favicon.ico") == 0 ||
+            strcmp(url, "/apple-touch-icon.png") == 0 ||
+            strcmp(url, "/apple-touch-icon") == 0) {
+            return serve_static_file(connection, "/fox_icon.png", con_info->language);
+        }
+
         if (strcmp(url, "/") == 0) {
             const char *path_param = MHD_lookup_connection_value(connection, MHD_GET_ARGUMENT_KIND, "path");
             const char *rel_path = path_param ? path_param : "/";
 
             char *dir_html = generate_dir_listing_html(rel_path);
             if (!dir_html) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("failed_read_directory", con_info->language), 
-                                            strlen(get_translation("failed_read_directory", con_info->language)), 500, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("failed_read_directory", con_info->language),
+                                               strlen(get_translation("failed_read_directory", con_info->language)), 500,
+                                               con_info->language);
             }
 
             size_t tmpl_size;
             char *tmpl = read_file(INDEX_HTML_PATH, &tmpl_size);
+            (void)tmpl_size;
             if (!tmpl) {
                 free(dir_html);
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("index_not_found", con_info->language), 
-                                            strlen(get_translation("index_not_found", con_info->language)), 500, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("index_not_found", con_info->language),
+                                               strlen(get_translation("index_not_found", con_info->language)), 500,
+                                               con_info->language);
             }
 
             char *tmp1 = replace_placeholder(tmpl, "{{FILE_TABLE}}", dir_html);
             free(tmpl);
             free(dir_html);
-            
+
             if (!tmp1) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("template_error", con_info->language), 
-                                            strlen(get_translation("template_error", con_info->language)), 500, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("template_error", con_info->language),
+                                               strlen(get_translation("template_error", con_info->language)), 500,
+                                               con_info->language);
             }
 
             char *final_html = replace_placeholder(tmp1, "{{CURRENT_PATH}}", rel_path);
             free(tmp1);
-            
+
             if (!final_html) {
-                return send_response_with_lang(connection, "text/plain", 
-                                            get_translation("template_error", con_info->language), 
-                                            strlen(get_translation("template_error", con_info->language)), 500, 
-                                            con_info->language);
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("template_error", con_info->language),
+                                               strlen(get_translation("template_error", con_info->language)), 500,
+                                               con_info->language);
             }
 
             enum MHD_Result ret = send_response_with_lang(connection, "text/html", final_html, strlen(final_html), 200, con_info->language);
@@ -1029,15 +1101,13 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
             return ret;
         }
 
-        return send_response_with_lang(connection, "text/plain", 
-                                     get_translation("not_found", con_info->language), 
-                                     strlen(get_translation("not_found", con_info->language)), 404, 
-                                     con_info->language);
-    }
-    else if (strcmp(method, "POST") == 0) {
+        return send_response_with_lang(connection, "text/plain",
+                                       get_translation("not_found", con_info->language),
+                                       strlen(get_translation("not_found", con_info->language)), 404,
+                                       con_info->language);
+    } else if (strcmp(method, "POST") == 0) {
         if (*upload_data_size != 0) {
             if (strcmp(url, "/upload") == 0) {
-                // 处理文件上传数据
                 enum MHD_Result result = handle_upload(con_info, connection, upload_data, *upload_data_size);
                 if (result != MHD_YES) {
                     return result;
@@ -1045,19 +1115,18 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
                 *upload_data_size = 0;
                 return MHD_YES;
             } else {
-                // 处理其他POST数据
                 size_t new_size = con_info->post_data_size + *upload_data_size;
                 if (new_size + 1 > con_info->post_data_alloc) {
                     size_t new_alloc = con_info->post_data_alloc * 2;
                     if (new_alloc < new_size + 1) new_alloc = new_size + 1;
-                    
+
                     char *new_data = realloc(con_info->post_data, new_alloc);
                     if (!new_data) return MHD_NO;
-                    
+
                     con_info->post_data = new_data;
                     con_info->post_data_alloc = new_alloc;
                 }
-                
+
                 memcpy(con_info->post_data + con_info->post_data_size, upload_data, *upload_data_size);
                 con_info->post_data_size = new_size;
                 con_info->post_data[new_size] = '\0';
@@ -1065,42 +1134,40 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
                 return MHD_YES;
             }
         } else {
-            // 处理完整的POST请求
             if (strcmp(url, "/upload") == 0) {
                 return finish_upload(con_info, connection);
-            } 
-            else if (strcmp(url, "/cmd") == 0) {
+            } else if (strcmp(url, "/cmd") == 0) {
                 urldecode(con_info->post_data);
-                
+
                 char *cmd = NULL;
                 char *upload_dir = NULL;
                 parse_post_fields(con_info->post_data, &cmd, &upload_dir);
-                
+                (void)upload_dir;
+
                 if (!cmd || !*cmd) {
-                    return send_response_with_lang(connection, "text/plain", 
-                                                get_translation("no_command", con_info->language), 
-                                                strlen(get_translation("no_command", con_info->language)), 400, 
-                                                con_info->language);
+                    return send_response_with_lang(connection, "text/plain",
+                                                   get_translation("no_command", con_info->language),
+                                                   strlen(get_translation("no_command", con_info->language)), 400,
+                                                   con_info->language);
                 }
 
                 char *output = run_command(cmd);
                 if (!output) {
-                    return send_response_with_lang(connection, "text/plain", 
-                                                get_translation("command_execution_failed", con_info->language), 
-                                                strlen(get_translation("command_execution_failed", con_info->language)), 500, 
-                                                con_info->language);
+                    return send_response_with_lang(connection, "text/plain",
+                                                   get_translation("command_execution_failed", con_info->language),
+                                                   strlen(get_translation("command_execution_failed", con_info->language)), 500,
+                                                   con_info->language);
                 }
 
                 enum MHD_Result ret = send_response_with_lang(connection, "text/plain", output, strlen(output), 200, con_info->language);
                 free(output);
                 return ret;
-            }
-            else if (strcmp(url, "/rename") == 0) {
+            } else if (strcmp(url, "/rename") == 0) {
                 urldecode(con_info->post_data);
-                
+
                 char *old_path = NULL;
                 char *new_path = NULL;
-                
+
                 char *saveptr;
                 char *token = strtok_r(con_info->post_data, "&", &saveptr);
                 while (token) {
@@ -1111,22 +1178,21 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
                     }
                     token = strtok_r(NULL, "&", &saveptr);
                 }
-                
+
                 if (!old_path || !new_path) {
-                    return send_response_with_lang(connection, "text/plain", 
-                                                get_translation("missing_parameters", con_info->language), 
-                                                strlen(get_translation("missing_parameters", con_info->language)), 400, 
-                                                con_info->language);
+                    return send_response_with_lang(connection, "text/plain",
+                                                   get_translation("missing_parameters", con_info->language),
+                                                   strlen(get_translation("missing_parameters", con_info->language)), 400,
+                                                   con_info->language);
                 }
-                
+
                 return handle_rename(connection, old_path, new_path, con_info->language);
-            }
-            else if (strcmp(url, "/delete") == 0) {
+            } else if (strcmp(url, "/delete") == 0) {
                 urldecode(con_info->post_data);
-                
+
                 char *path = NULL;
                 char *type = NULL;
-                
+
                 char *saveptr;
                 char *token = strtok_r(con_info->post_data, "&", &saveptr);
                 while (token) {
@@ -1137,35 +1203,36 @@ static enum MHD_Result answer_to_connection(void *cls, struct MHD_Connection *co
                     }
                     token = strtok_r(NULL, "&", &saveptr);
                 }
-                
+
                 if (!path || !type) {
-                    return send_response_with_lang(connection, "text/plain", 
-                                                get_translation("missing_parameters", con_info->language), 
-                                                strlen(get_translation("missing_parameters", con_info->language)), 400, 
-                                                con_info->language);
+                    return send_response_with_lang(connection, "text/plain",
+                                                   get_translation("missing_parameters", con_info->language),
+                                                   strlen(get_translation("missing_parameters", con_info->language)), 400,
+                                                   con_info->language);
                 }
-                
+
                 return handle_delete(connection, path, type, con_info->language);
-            }
-            else {
-                return send_response_with_lang(connection, "text/plain", 
-                                             get_translation("unknown_endpoint", con_info->language), 
-                                             strlen(get_translation("unknown_endpoint", con_info->language)), 404, 
-                                             con_info->language);
+            } else {
+                return send_response_with_lang(connection, "text/plain",
+                                               get_translation("unknown_endpoint", con_info->language),
+                                               strlen(get_translation("unknown_endpoint", con_info->language)), 404,
+                                               con_info->language);
             }
         }
     }
 
-    return send_response_with_lang(connection, "text/plain", 
-                                 get_translation("method_not_allowed", con_info->language), 
-                                 strlen(get_translation("method_not_allowed", con_info->language)), 405, 
-                                 con_info->language);
+    return send_response_with_lang(connection, "text/plain",
+                                   get_translation("method_not_allowed", con_info->language),
+                                   strlen(get_translation("method_not_allowed", con_info->language)), 405,
+                                   con_info->language);
 }
 
 // 请求完成回调
 static void request_completed(void *cls, struct MHD_Connection *connection,
-                             void **con_cls, enum MHD_RequestTerminationCode toe) {
-    (void)cls; (void)connection; (void)toe;
+                              void **con_cls, enum MHD_RequestTerminationCode toe) {
+    (void)cls;
+    (void)connection;
+    (void)toe;
 
     struct connection_info_struct *con_info = *con_cls;
     if (con_info) {
@@ -1173,16 +1240,16 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
             if (con_info->upload_cancelled && con_info->upload_file_path) {
                 delete_uploaded_file(con_info->upload_file_path);
             }
-            
+
             if (con_info->upload_fd >= 0) {
                 close(con_info->upload_fd);
             }
-            
+
             if (con_info->upload_file_path) {
                 free(con_info->upload_file_path);
             }
         }
-        
+
         if (con_info->post_data) free(con_info->post_data);
         if (con_info->upload_filename) free(con_info->upload_filename);
         if (con_info->upload_dir) free(con_info->upload_dir);
@@ -1192,7 +1259,8 @@ static void request_completed(void *cls, struct MHD_Connection *connection,
 }
 
 int main(int argc, char *argv[]) {
-    (void)argc; (void)argv;
+    (void)argc;
+    (void)argv;
 
     const char *system_lang = "en";
     char *lang_env = getenv("LANG");
@@ -1200,7 +1268,6 @@ int main(int argc, char *argv[]) {
         system_lang = "zh";
     }
 
-    // 修复编译警告：使用安全的printf格式
     printf("%s", get_translation("server_starting", system_lang));
     printf("\n");
 
@@ -1212,16 +1279,14 @@ int main(int argc, char *argv[]) {
     );
 
     if (!daemon) {
-        // 修复编译警告：使用安全的printf格式
         fprintf(stderr, "%s", get_translation("server_start_failed", system_lang));
         fprintf(stderr, "\n");
         return 1;
     }
 
-    // 修复编译警告：使用安全的printf格式
     printf("%s", get_translation("server_running", system_lang));
     printf("\n");
-    
+
     while (1) pause();
 
     MHD_stop_daemon(daemon);

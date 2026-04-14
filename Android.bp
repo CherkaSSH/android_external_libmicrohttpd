@@ -26,6 +26,13 @@ prebuilt_etc {
 }
 
 prebuilt_etc {
+    name: "fox_icon.png",
+    src: "fox_icon.png",
+    recovery: true,
+    sub_dir: "www",
+}
+
+prebuilt_etc {
     name: "microhttpd.rc",
     src: "microhttpd.rc",
     recovery: true,
