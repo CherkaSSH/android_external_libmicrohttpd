@@ -353,6 +353,42 @@ main {
   color: var(--text-primary);
 }
 
+.hero-subtitle {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.hero-chips {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.hero-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.section-lead {
+  margin: -6px 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
 section {
   background: var(--card-bg);
   border-radius: var(--radius-card);
@@ -615,6 +651,34 @@ a.file-link:hover, a.dir-link:hover {
   margin-top: 10px;
 }
 
+.upload-info {
+  margin-bottom: 10px;
+}
+
+.warning-line {
+  color: var(--warning-text);
+  margin-bottom: 4px;
+}
+
+.terminal-warning {
+  margin-bottom: 12px;
+  color: var(--danger-color);
+}
+
+.terminal-frame-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  padding: 4px;
+  background: var(--bg-color);
+}
+
+.terminal-frame-wrap #ttyd-frame {
+  border: none !important;
+}
+
 /* Context Menu */
 .context-menu {
   display: none;
@@ -731,6 +795,10 @@ a.file-link:hover, a.dir-link:hover {
 
   .brand-text {
     font-size: 15px;
+  }
+
+  .hero-subtitle {
+    font-size: 13px;
   }
 
   .utility-pill {
@@ -871,7 +939,7 @@ a.file-link:hover, a.dir-link:hover {
 }
 </style>
 </head>
-<body class="dark-theme">
+<body>
 
 <header class="topbar-wrap">
   <div class="topbar">
@@ -903,10 +971,16 @@ a.file-link:hover, a.dir-link:hover {
   <div class="hero-title">
     <span>OrangeFox</span>
     <strong>File Manager</strong>
+    <p class="hero-subtitle" data-i18n="hero_subtitle">Recovery 环境下的高效文件管理与终端入口</p>
+    <div class="hero-chips">
+      <span class="hero-chip" data-i18n="hero_chip_speed">快速浏览与批量操作</span>
+      <span class="hero-chip" data-i18n="hero_chip_safe">上传保护与路径校验</span>
+    </div>
   </div>
 
   <section id="explorer-section">
     <h2 data-i18n="browse_title">目录浏览</h2>
+    <p class="section-lead" data-i18n="browse_lead">在同一面板中切换目录、上传文件并执行右键操作。</p>
 
     <div class="path-upload-container">
       <div class="path-form">
@@ -934,11 +1008,11 @@ a.file-link:hover, a.dir-link:hover {
       </div>
     </div>
 
-    <div class="upload-info" style="margin-bottom: 10px;">
+    <div class="upload-info">
       <span id="space-status" class="small" data-i18n="target_path">目标路径为上方的切换路径</span>
     </div>
 
-    <div class="small" data-i18n="edge_warning" style="color: var(--warning-text); margin-bottom: 4px;">
+    <div class="small warning-line" data-i18n="edge_warning">
       请勿使用Microsoft Edge浏览器进行大型文件上传，会直接失败！
     </div>
     <div class="small" data-i18n="right_click_hint">
@@ -974,10 +1048,11 @@ a.file-link:hover, a.dir-link:hover {
 
   <section id="terminal-section">
     <h2 data-i18n="terminal_title">终端</h2>
-    <div class="small" data-i18n="terminal_warning" style="margin-bottom: 12px; color: var(--danger-color);">
+    <p class="section-lead" data-i18n="terminal_lead">内置 ttyd 终端，直接进入恢复环境执行命令。</p>
+    <div class="small terminal-warning" data-i18n="terminal_warning">
       命令将在 recovery 环境下以 root 身份执行。务必确认你在做什么。
     </div>
-    <div style="width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch;">
+    <div class="terminal-frame-wrap">
       <iframe id="ttyd-frame" style="width:100%; min-width:800px; height:520px; border-radius:12px; border:1px solid var(--border-color);"></iframe>
     </div>
   </section>
@@ -1034,10 +1109,14 @@ document.getElementById("ttyd-frame").src = url;
 const translations = {
   zh: {
     'app_title': 'OrangeFox',
+    'hero_subtitle': 'Recovery 环境下的高效文件管理与终端入口',
+    'hero_chip_speed': '快速浏览与批量操作',
+    'hero_chip_safe': '上传保护与路径校验',
     'language_toggle': 'EN',
     'theme_toggle': '主题',
     'upload_notice': '文件上传中，右键菜单已被禁用，请勿刷新页面！',
     'browse_title': '目录浏览',
+    'browse_lead': '在同一面板中切换目录、上传文件并执行右键操作。',
     'switch_path': '切换路径:',
     'open_button': '跳转',
     'up_button': '上级',
@@ -1054,6 +1133,7 @@ const translations = {
     'table_owner': '所有者',
     'table_group': '用户组',
     'terminal_title': '终端命令',
+    'terminal_lead': '内置 ttyd 终端，直接进入恢复环境执行命令。',
     'terminal_warning': '警告：命令将以 ROOT 权限在 Recovery 环境中执行，请谨慎操作。',
     'cmd_placeholder': '例如: ls -l /',
     'execute_button': '执行',
@@ -1086,10 +1166,14 @@ const translations = {
   },
   en: {
     'app_title': 'OrangeFox',
+    'hero_subtitle': 'Fast file management and terminal access for recovery mode.',
+    'hero_chip_speed': 'Fast browsing and batch actions',
+    'hero_chip_safe': 'Upload protection and path checks',
     'language_toggle': '中文',
     'theme_toggle': 'Theme',
     'upload_notice': 'Uploading... Do not refresh!',
     'browse_title': 'Explorer',
+    'browse_lead': 'Navigate folders, upload files, and run context actions in one panel.',
     'switch_path': 'Path:',
     'open_button': 'Go',
     'up_button': 'Up',
@@ -1106,6 +1190,7 @@ const translations = {
     'table_owner': 'Owner',
     'table_group': 'Group',
     'terminal_title': 'Terminal',
+    'terminal_lead': 'Built-in ttyd terminal for direct commands in recovery mode.',
     'terminal_warning': 'Root access enabled. Use with caution.',
     'cmd_placeholder': 'e.g., ls -l /',
     'execute_button': 'Run',
