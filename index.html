@@ -1109,18 +1109,35 @@ body.light-theme {
 
 .topbar .nav-pill,
 .topbar .utility-pill,
-.topbar .icon-pill {
-  color: #fff;
-  background: transparent;
-  border: 1px solid transparent;
+.topbar .icon-pill,
+.light-theme .topbar .nav-pill,
+.light-theme .topbar .utility-pill,
+.light-theme .topbar .icon-pill,
+.light-theme .topbar .language-toggle,
+.light-theme .topbar .theme-toggle {
+  color: #fff !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
 }
 
 .topbar .nav-pill:hover,
 .topbar .utility-pill:hover,
-.topbar .icon-pill:hover {
-  background: rgba(255, 255, 255, 0.16);
-  color: #fff;
+.topbar .icon-pill:hover,
+.light-theme .topbar .nav-pill:hover,
+.light-theme .topbar .utility-pill:hover,
+.light-theme .topbar .icon-pill:hover,
+.light-theme .topbar .language-toggle:hover,
+.light-theme .topbar .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
   transform: none;
+}
+
+.topbar .brand,
+.topbar .brand-text,
+.light-theme .topbar .brand,
+.light-theme .topbar .brand-text {
+  color: #fff !important;
 }
 
 .topbar .nav-pill.nav-pill-active {
@@ -1387,33 +1404,50 @@ a.file-link:hover, a.dir-link:hover {
   text-decoration: none;
 }
 
-.cta-primary {
+/* Use .cta-btn.cta-* for higher specificity than .light-theme button */
+.cta-btn.cta-primary,
+.light-theme .cta-btn.cta-primary {
   background: var(--ofx-primary);
   color: #fff;
+  border: 1px solid transparent;
   box-shadow: var(--ofx-glow);
 }
 
-.cta-primary:hover {
+.cta-btn.cta-primary:hover,
+.light-theme .cta-btn.cta-primary:hover {
   background: var(--ofx-primary-strong);
+  color: #fff;
   transform: translateY(-2px);
   box-shadow: 0 14px 36px rgba(255, 112, 2, 0.5);
 }
 
-.cta-secondary {
+.cta-btn.cta-primary span {
+  color: inherit;
+}
+
+.cta-btn.cta-secondary {
   background: transparent;
   color: var(--ofx-text);
   border: 1px solid var(--ofx-border);
 }
 
-.cta-secondary:hover {
+.light-theme .cta-btn.cta-secondary {
+  background: transparent;
+  color: var(--ofx-text);
+  border: 1px solid var(--ofx-border);
+}
+
+.cta-btn.cta-secondary:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 112, 2, 0.55);
   color: var(--ofx-primary);
   transform: translateY(-2px);
 }
 
-.light-theme .cta-secondary:hover {
+.light-theme .cta-btn.cta-secondary:hover {
   background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(255, 112, 2, 0.55);
+  color: var(--ofx-primary);
 }
 
 .cta-btn .cta-icon {
