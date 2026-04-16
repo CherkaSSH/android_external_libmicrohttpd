@@ -1421,86 +1421,6 @@ a.file-link:hover, a.dir-link:hover {
   line-height: 1;
 }
 
-/* ---- Features grid (orangefox.download-style cards) ---- */
-.features {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 4px 0 0 !important;
-  margin-top: 8px;
-}
-
-.features-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 14px;
-}
-
-.feature-card {
-  background: var(--ofx-surface);
-  border: 1px solid var(--ofx-border);
-  border-radius: 20px;
-  padding: 20px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: transform 0.22s var(--transition-ease), border-color 0.22s var(--transition-ease), box-shadow 0.22s var(--transition-ease);
-  position: relative;
-  overflow: hidden;
-}
-
-.feature-card::before {
-  content: "";
-  position: absolute;
-  inset: -1px -1px auto auto;
-  width: 110px;
-  height: 110px;
-  background: radial-gradient(circle at top right, rgba(255, 112, 2, 0.16), transparent 70%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s var(--transition-ease);
-}
-
-.feature-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(255, 112, 2, 0.55);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
-}
-
-.feature-card:hover::before {
-  opacity: 1;
-}
-
-.feature-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: rgba(255, 112, 2, 0.14);
-  color: var(--ofx-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  font-weight: 900;
-  border: 1px solid rgba(255, 112, 2, 0.25);
-}
-
-.feature-title {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--ofx-text);
-  letter-spacing: -0.01em;
-  margin: 0;
-}
-
-.feature-desc {
-  font-size: 13px;
-  color: var(--ofx-muted);
-  line-height: 1.5;
-  margin: 0;
-  font-weight: 500;
-}
-
 /* ---- Footer ---- */
 .site-footer {
   max-width: 980px;
@@ -1684,15 +1604,6 @@ a.file-link:hover, a.dir-link:hover {
     justify-content: center;
   }
 
-  .features-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .feature-card {
-    padding: 16px 14px;
-  }
-
   .site-footer {
     margin: 18px 12px 28px;
     padding: 18px 10px;
@@ -1748,26 +1659,6 @@ a.file-link:hover, a.dir-link:hover {
       </button>
     </div>
   </div>
-
-  <section class="features" aria-label="Features">
-    <div class="features-grid">
-      <div class="feature-card">
-        <div class="feature-icon" aria-hidden="true">&#9889;</div>
-        <h3 class="feature-title" data-i18n="feat_fast_title">Fast Browsing</h3>
-        <p class="feature-desc" data-i18n="feat_fast_desc">Snappy directory navigation and batch operations in recovery.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon" aria-hidden="true">&#128274;</div>
-        <h3 class="feature-title" data-i18n="feat_safe_title">Safe Uploads</h3>
-        <p class="feature-desc" data-i18n="feat_safe_desc">Path validation and upload protection keep your device safe.</p>
-      </div>
-      <div class="feature-card">
-        <div class="feature-icon" aria-hidden="true">&#128187;</div>
-        <h3 class="feature-title" data-i18n="feat_term_title">Recovery Terminal</h3>
-        <p class="feature-desc" data-i18n="feat_term_desc">Embedded ttyd terminal for running commands as root on the fly.</p>
-      </div>
-    </div>
-  </section>
 
   <section id="explorer-section">
     <h2 data-i18n="browse_title">目录浏览</h2>
@@ -1913,12 +1804,6 @@ const translations = {
     'hero_chip_safe': '上传保护与路径校验',
     'cta_browse': '浏览文件',
     'cta_terminal': '打开终端',
-    'feat_fast_title': '极速浏览',
-    'feat_fast_desc': '在 Recovery 环境下快速切换目录并批量处理。',
-    'feat_safe_title': '安全上传',
-    'feat_safe_desc': '路径校验与上传保护，让设备始终安全可控。',
-    'feat_term_title': 'Recovery 终端',
-    'feat_term_desc': '内置 ttyd 终端，随手以 root 身份执行命令。',
     'footer_tagline': 'Web 文件管理器',
     'footer_wiki': '官方 Wiki',
     'language_toggle': 'EN',
@@ -1981,12 +1866,6 @@ const translations = {
     'hero_chip_safe': 'Upload protection and path checks',
     'cta_browse': 'Browse Files',
     'cta_terminal': 'Open Terminal',
-    'feat_fast_title': 'Fast Browsing',
-    'feat_fast_desc': 'Snappy directory navigation and batch operations in recovery.',
-    'feat_safe_title': 'Safe Uploads',
-    'feat_safe_desc': 'Path validation and upload protection keep your device safe.',
-    'feat_term_title': 'Recovery Terminal',
-    'feat_term_desc': 'Embedded ttyd terminal for running commands as root on the fly.',
     'footer_tagline': 'Web File Manager',
     'footer_wiki': 'Wiki',
     'language_toggle': '中文',
