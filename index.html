@@ -777,10 +777,6 @@ a.file-link:hover, a.dir-link:hover {
     gap: 8px;
   }
 
-  .topbar-center {
-    display: none;
-  }
-
   .topbar-left {
     min-width: auto;
     flex: 0 0 auto;
@@ -1518,6 +1514,21 @@ a.file-link:hover, a.dir-link:hover {
     display: none;
   }
 
+  .topbar-center {
+    display: flex;
+    flex: 1 1 auto;
+    justify-content: center;
+    gap: 0;
+    overflow: hidden;
+  }
+
+  .topbar-center .nav-pill {
+    height: 30px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
   .brand-text {
     display: none;
   }
@@ -2085,6 +2096,47 @@ document.getElementById('theme-toggle').addEventListener('click', function() {
 
   refreshThemeIcon();
 });
+
+function setActiveNavPill(pill) {
+  document.querySelectorAll('.topbar-center .nav-pill').forEach(p => {
+    p.classList.remove('nav-pill-active');
+  });
+  if (pill) pill.classList.add('nav-pill-active');
+}
+
+document.querySelectorAll('.topbar-center .nav-pill').forEach(pill => {
+  pill.addEventListener('click', function() {
+    setActiveNavPill(this);
+  });
+});
+
+(function setupScrollSpy() {
+  const pills = document.querySelectorAll('.topbar-center .nav-pill');
+  if (!pills.length) return;
+
+  const homePill = pills[0];
+  const explorerPill = pills[1];
+  const terminalPill = pills[2];
+
+  const explorerSection = document.getElementById('explorer-section');
+  const terminalSection = document.getElementById('terminal-section');
+
+  function onScroll() {
+    const y = window.scrollY || window.pageYOffset;
+    const threshold = 120;
+
+    if (terminalSection && y + threshold >= terminalSection.offsetTop) {
+      setActiveNavPill(terminalPill);
+    } else if (explorerSection && y + threshold >= explorerSection.offsetTop) {
+      setActiveNavPill(explorerPill);
+    } else {
+      setActiveNavPill(homePill);
+    }
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+})();
 
 document.addEventListener('DOMContentLoaded', function() {
   const savedLang = localStorage.getItem('language');
